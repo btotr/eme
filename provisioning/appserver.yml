@@ -1,0 +1,6 @@
+# playbooks for appserver
+ - hosts: all
+   sudo: yes
+   roles:
+    - geerlingguy.nodejs
+    - appserver

@@ -1,0 +1,131 @@
+<html>
+    <head>
+        <title>media source</title>
+        <style type="text/css">
+            body, html {
+                padding:0; margin:0;
+                min-width:1280px;
+            }
+        </style>
+    </head>
+    <body>
+    <video autoplay></video>
+    <script>
+
+        function MediaInfo() {
+            this.offset   = 0;
+            this.buffer   = 0;
+            this.chunks   = 10;
+            this.chunkSize = function(){
+                return Math.floor(this.sizeInBytes/this.chunks);
+            };
+            this.queue = [];
+        }
+
+        var videoInfo = new MediaInfo();
+        videoInfo.mediaURL = "video";
+        videoInfo.mime     = "video/mp4; codecs=\"avc1.640028\"";
+        // ffprobe test.mp4  -show_format | grep size;
+        videoInfo.sizeInBytes = 7181049;
+        videoInfo.chunks   = 10;
+
+        var audioInfo = new MediaInfo();
+        audioInfo.mediaURL = "car-20120827-8d.mp4";
+        audioInfo.mime     = "audio/mp4; codecs=\"mp4a.40.2\"";
+        audioInfo.sizeInBytes = 5700000;
+
+        var onSourceOpen = function() {
+            if (ms.sourceBuffers.length) {
+                return;
+            }
+            // attach the source buffers
+            videoInfo.buffer = ms.addSourceBuffer(videoInfo.mime);
+            //audioInfo.buffer = ms.addSourceBuffer(audioInfo.mime);
+            // load the first chunks
+            loadChunk.call(videoInfo);
+            //loadChunk.call(audioInfo);
+        };
+
+        function nextChunk(){
+            if (this.offset === this.chunks - 1) {
+                console.log("all chunks downloaded from: " + this.mediaURL);
+                return;
+            }
+            this.offset++;
+            loadChunk.call(this);
+        }
+
+        function loadChunk(){
+            var xhr = new XMLHttpRequest();
+            xhr.open("GET", this.mediaURL);
+            xhr.responseType = "arraybuffer";
+            var chunkSize = this.chunkSize();
+            var startByte = parseInt(chunkSize * this.offset);
+            var range = startByte + "-" + (startByte + chunkSize - 1);
+            console.info("loading next chunk: ", range, this.offset);
+            xhr.setRequestHeader("Range", "bytes=" + range);
+
+            var self = this;
+            xhr.addEventListener("load", function(e) {
+
+                var buf = new Uint8Array(e.target.response);
+
+                // only update if we are finishing updating
+                if (self.buffer.updating || self.queue.length === 0) {
+                    self.queue.push(buf);
+                    if (self.buffer.updating) {
+                        return;
+                    }
+                }
+
+                var append = function(buffer) {
+                    // cloudtv doesn't support appendBuffer use append instead
+                    if (!self.buffer.appendBuffer) {
+                        self.buffer.append(buffer);
+                        return;
+                    }
+                    self.buffer.appendBuffer(buffer);
+                };
+
+                // append buffer to source buffer
+                append(self.queue.shift());
+
+                var testUpdate = function(timeEvent){
+                    var dur = video.duration;
+                    if (isNaN(dur) || dur === Infinity) {
+                        dur = 33; //static if no video durartion
+                    }
+
+                    var chunkDuration = dur/self.chunks;
+                    // 40% fudge factor
+                    var threshold = self.offset * chunkDuration * 0.6;
+                    if (timeEvent.target.currentTime >= threshold) {
+                        video.removeEventListener("timeupdate", testUpdate, false);
+                        nextChunk.call(self);
+                    }
+                };
+
+                video.addEventListener("timeupdate", testUpdate, false);
+
+            });
+            xhr.send();
+        }
+
+        // unprefix mediasource
+        if (window.WebKitMediaSource !== undefined) {
+            window.MediaSource = window.WebKitMediaSource;
+        }
+        var ms = new MediaSource();
+        ms.addEventListener("sourceopen", onSourceOpen);
+        ms.addEventListener("webkitsourceopen", onSourceOpen);
+
+        // attach to video element
+        var video = document.getElementsByTagName("video")[0];
+        video.src =  window.URL.createObjectURL(ms);
+        video.addEventListener("error", function onError(e) {
+            console.error(e.target.error);
+        });
+        
+    </script>
+    </body>
+</html>

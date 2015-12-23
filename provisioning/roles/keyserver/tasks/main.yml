@@ -1,0 +1,24 @@
+---
+
+  - file: path=/home/vagrant/security 
+      state=directory 
+      mode=0755
+
+  - name: "deploy appserver file"
+    copy: src=key-server.js
+      dest=/home/vagrant/
+      owner=vagrant mode=0644
+
+  - name: "deploy security file"
+    copy: src=security/
+      dest=/home/vagrant/security/
+      owner=vagrant mode=0644
+
+  - name: "Check list of Node.js apps running."
+    command: forever list
+    register: forever_list
+    changed_when: false      
+
+  - name: "Start  Node.js app."
+    command: forever start /home/vagrant/key-server.js
+    when: "forever_list.stdout.find('/home/vagrant/key-server.js') == -1"
