@@ -3,14 +3,21 @@ var fs = require('fs'),
     url = require('url'),
     path = require('path');
 
-var indexPage, movie;
+    var media = {
+        video:{}, 
+        audio:{}
+    }
 
-// load the video files and the index html page
 fs.readFile(path.resolve(__dirname,"../../../../applications/bbb-clearkey.mp4"), function (err, data) {
-    movie = data;
+    media.video.data = data;
+    media.video.total = media.video.data.length
 });
 
-// create http server
+fs.readFile(path.resolve(__dirname,"../../../../applications/bbb-audio-clearkey.mp4"), function (err, data) {
+    media.audio.data = data;
+    media.audio.total = media.audio.data.length
+});
+
 http.createServer(function (req, res) {
     
     var reqResource = url.parse(req.url).pathname;
@@ -25,20 +32,17 @@ http.createServer(function (req, res) {
     } else if (reqResource == "/favicon.ico"){
         res.writeHead(404);
         res.end();
-    } else {
-            var total;
-            if(reqResource == "/video"){
-                total = movie.length;
-                var range = req.headers.range;
-                var positions = range.replace(/bytes=/, "").split("-");
-                var start = parseInt(positions[0], 10);
-                var end = positions[1] ? parseInt(positions[1], 10) : total - 1;
-                var chunksize = (end-start)+1;
-                res.writeHead(206, { "Content-Range": "bytes " + start + "-" + end + "/" + total, 
-                                     "Accept-Ranges": "bytes",
-                                     "Content-Length": chunksize,
-                                     "Content-Type":"video/mp4"});
-                res.end(movie.slice(start, end+1), "binary");
-            }
+    } else { // assume video or audio
+        var type = reqResource.replace("/", "")
+        var range = req.headers.range;
+        var positions = range.replace(/bytes=/, "").split("-");
+        var start = parseInt(positions[0], 10);
+        var end = positions[1] ? parseInt(positions[1], 10) : total - 1;
+        var chunksize = (end-start)+1;
+        res.writeHead(206, { "Content-Range": "bytes " + start + "-" + end + "/" + media[type].total, 
+                             "Accept-Ranges": "bytes",
+                             "Content-Length": chunksize,
+                             "Content-Type":"video/mp4"});
+        res.end(media[type].data.slice(start, end+1), "binary");
     }
 }).listen(2626);

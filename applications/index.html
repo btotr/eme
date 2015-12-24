@@ -27,12 +27,12 @@
         videoInfo.mime     = "video/mp4; codecs=\"avc1.64001F\"";
         // ffprobe test.mp4  -show_format | grep size;
         videoInfo.sizeInBytes = 7181049;
-        videoInfo.chunks   = 10;
+        videoInfo.chunks   = 20;
 
         var audioInfo = new MediaInfo();
         audioInfo.mediaURL = "audio";
         audioInfo.mime     = "audio/mp4; codecs=\"mp4a.40.2\"";
-        audioInfo.sizeInBytes = 5700000;
+        audioInfo.sizeInBytes = 801059;
 
         var onSourceOpen = function() {
             if (ms.sourceBuffers.length) {
@@ -40,10 +40,10 @@
             }
             // attach the source buffers
             videoInfo.buffer = ms.addSourceBuffer(videoInfo.mime);
-            //audioInfo.buffer = ms.addSourceBuffer(audioInfo.mime);
+            audioInfo.buffer = ms.addSourceBuffer(audioInfo.mime);
             // load the first chunks
             loadChunk.call(videoInfo);
-            //loadChunk.call(audioInfo);
+            loadChunk.call(audioInfo);
         };
 
         function nextChunk(){
@@ -137,15 +137,19 @@
          }
           xhr.send()
        }
-
+       
+       var beenThereDoneThat = false;
        video.addEventListener("encrypted", function(ev) {
-         console.log("video is encrypted");
+         // only do it for the first media buffer
+          if (beenThereDoneThat) return
+         beenThereDoneThat = true
+         console.log("video is encrypted");    
          navigator.requestMediaKeySystemAccess("org.w3.clearkey", [
             {
                initDataTypes: ["cenc"],
                videoCapabilities: [{contentType: videoInfo.mime}],
                audioCapabilities: [{contentType: audioInfo.mime}]
-            }
+            } 
          ]).then(function(keySystemAccess) {
              return keySystemAccess.createMediaKeys();
          }).then(function(mediaKeys) {
