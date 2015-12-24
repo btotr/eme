@@ -5,7 +5,7 @@ var url = require('url');
 
 keys = {
     '10000000100010001000100000000001': new Buffer("3A2A1B68DD2BD9B2EEB25E84C4776668", 'hex'),
-    '10000000100010001000100000000002': new Buffer("04714BD8D7E1F3815FC47D0A834F0E18", 'hex')
+    '10000000100010001000100000000002': new Buffer("04714BD8D7E1F3815FC47D0A834F0E18", 'hex'),
 };
 
 var options = {
@@ -26,10 +26,22 @@ var addCORSHeaders = function(res, length) {
 https.createServer(options, function(req, res) {
     addCORSHeaders(res);
     res.end("hello world\n");
-
 }).listen(8585);
 
+
+function Base64ToHex(str)
+{
+    var b = new Buffer(str, 'base64')
+    return b.toString('hex');
+}
+
+function HexToBase64(str) {
+    var b = new Buffer(str, 'hex')
+    return b.toString('base64').replace("==", "");
+}
+
 http.createServer(function(req, res) {
+    
     var parsed_url = url.parse(req.url, true);
     var query = parsed_url.query;
 
@@ -38,30 +50,35 @@ http.createServer(function(req, res) {
         res.writeHeader(400, "Illegal query string");
         res.end();
     }
+    
+    var msg = JSON.parse(query.keyid )
 
-    var keyIDs = [];
-    if (query.keyid instanceof Array) {
-        keyIDs = query.keyid;
-    } else {
-        keyIDs.push(query.keyid);
+    var outKeys = [];
+    for (var i = 0; i < msg.kids.length; i++) {
+      var id64 = msg.kids[i];
+      var idHex = Base64ToHex(msg.kids[i]).toLowerCase();
+      var key = keys[idHex];
+
+      if (key) {
+        outKeys.push({
+          "kty":"oct",
+          "alg":"A128KW",
+          "kid":id64,
+          "k":HexToBase64(key)
+        });
+     } else {
+        console.log("couldn't find key for key id " + idHex);
+     }
     }
 
-    var jwk_array = [];
-    for (var i = 0; i < keyIDs.length; i++) {
-        var jwk = {
-            kty: "oct",
-            alg: "A128GCM",
-            kid: new Buffer(keyIDs[i], 'hex').toString('base64').replace(/=/g, ""),
-            k: keys[keyIDs[i]].toString('base64').replace(/=/g, "")
-        };
-        jwk_array.push(jwk);
-    }
-    var response = {
-        keys: jwk_array
-    };
-    var json_str_response = JSON.stringify(response);
-    addCORSHeaders(res, json_str_response.length);
-    res.write(json_str_response);
+    var update = JSON.stringify({
+      "keys" : outKeys,
+      "type" : msg.type
+    });
+    console.log(update)
+    var bufferUpdate = new Buffer(update, "binary")
+    addCORSHeaders(res, bufferUpdate.length);
+    res.write(bufferUpdate);
     res.end();
 
 }).listen(8584);

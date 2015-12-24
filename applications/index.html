@@ -24,13 +24,13 @@
 
         var videoInfo = new MediaInfo();
         videoInfo.mediaURL = "video";
-        videoInfo.mime     = "video/mp4; codecs=\"avc1.640028\"";
+        videoInfo.mime     = "video/mp4; codecs=\"avc1.64001F\"";
         // ffprobe test.mp4  -show_format | grep size;
         videoInfo.sizeInBytes = 7181049;
         videoInfo.chunks   = 10;
 
         var audioInfo = new MediaInfo();
-        audioInfo.mediaURL = "car-20120827-8d.mp4";
+        audioInfo.mediaURL = "audio";
         audioInfo.mime     = "audio/mp4; codecs=\"mp4a.40.2\"";
         audioInfo.sizeInBytes = 5700000;
 
@@ -67,7 +67,6 @@
 
             var self = this;
             xhr.addEventListener("load", function(e) {
-
                 var buf = new Uint8Array(e.target.response);
 
                 // only update if we are finishing updating
@@ -95,7 +94,6 @@
                     if (isNaN(dur) || dur === Infinity) {
                         dur = 33; //static if no video durartion
                     }
-
                     var chunkDuration = dur/self.chunks;
                     // 40% fudge factor
                     var threshold = self.offset * chunkDuration * 0.6;
@@ -104,28 +102,63 @@
                         nextChunk.call(self);
                     }
                 };
-
                 video.addEventListener("timeupdate", testUpdate, false);
-
             });
             xhr.send();
         }
 
-        // unprefix mediasource
+        // attach to video element
+        var video = document.getElementsByTagName("video")[0];
+        
+        // MSE
         if (window.WebKitMediaSource !== undefined) {
             window.MediaSource = window.WebKitMediaSource;
         }
         var ms = new MediaSource();
         ms.addEventListener("sourceopen", onSourceOpen);
         ms.addEventListener("webkitsourceopen", onSourceOpen);
-
-        // attach to video element
-        var video = document.getElementsByTagName("video")[0];
-        video.src =  window.URL.createObjectURL(ms);
-        video.addEventListener("error", function onError(e) {
-            console.error(e.target.error);
-        });
         
+        video.src =  window.URL.createObjectURL(ms);
+        
+        // EME
+       function updateCDM(e){
+          // license request
+          var xhr = new XMLHttpRequest();
+          var keyid = String.fromCharCode.apply(null, new Uint8Array(e.message));
+          xhr.responseType = "arraybuffer";
+          xhr.open("GET", "http://localhost:8584?keyid="+keyid);
+          xhr.onreadystatechange = function() {
+            if (xhr.readyState == 4 && xhr.status == 200) {
+               var updateMessage = xhr.response
+               e.target.update(updateMessage).then(function() {
+                 console.log("succesfull cdm update");
+               },function(e){console.log(e)});
+            }
+         }
+          xhr.send()
+       }
+
+       video.addEventListener("encrypted", function(ev) {
+         console.log("video is encrypted");
+         navigator.requestMediaKeySystemAccess("org.w3.clearkey", [
+            {
+               initDataTypes: ["cenc"],
+               videoCapabilities: [{contentType: videoInfo.mime}],
+               audioCapabilities: [{contentType: audioInfo.mime}]
+            }
+         ]).then(function(keySystemAccess) {
+             return keySystemAccess.createMediaKeys();
+         }).then(function(mediaKeys) {
+             return video.setMediaKeys(mediaKeys);
+         }).then(function() {
+             var session = video.mediaKeys.createSession();
+             session.addEventListener("message", function(e){ updateCDM(e)});
+             return session.generateRequest(ev.initDataType, ev.initData);
+           }).then(function() {
+             console.log("generated cdm request");
+           });
+       });
+
     </script>
     </body>
 </html>

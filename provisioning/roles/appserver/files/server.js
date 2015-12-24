@@ -6,7 +6,7 @@ var fs = require('fs'),
 var indexPage, movie;
 
 // load the video files and the index html page
-fs.readFile(path.resolve(__dirname,"applications/bbb.mp4"), function (err, data) {
+fs.readFile(path.resolve(__dirname,"../../../../applications/bbb-clearkey.mp4"), function (err, data) {
     movie = data;
 });
 
@@ -17,7 +17,7 @@ http.createServer(function (req, res) {
     console.log("Resource: " + reqResource);
 
     if(reqResource == "/"){
-        fs.readFile(path.resolve(__dirname,"applications/index.html"), function (err, data) {
+        fs.readFile(path.resolve(__dirname,"../../../../applications/index.html"), function (err, data) {
             res.writeHead(200, {'Content-Type': 'text/html'});
             res.write(data);
             res.end();
@@ -41,4 +41,4 @@ http.createServer(function (req, res) {
                 res.end(movie.slice(start, end+1), "binary");
             }
     }
-}).listen(8888);
+}).listen(2626);
