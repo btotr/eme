@@ -22,15 +22,7 @@ var addCORSHeaders = function(res, length) {
         "Access-Control-Allow-Headers": 'Content-Type, Authorization, Content-Length, X-Requested-Width'});
 };
 
-// Still testing this
-https.createServer(options, function(req, res) {
-    addCORSHeaders(res);
-    res.end("hello world\n");
-}).listen(8585);
-
-
-function Base64ToHex(str)
-{
+function Base64ToHex(str){
     var b = new Buffer(str, 'base64')
     return b.toString('hex');
 }
@@ -40,7 +32,7 @@ function HexToBase64(str) {
     return b.toString('base64').replace("==", "");
 }
 
-http.createServer(function(req, res) {
+https.createServer(options, function(req, res) {
     
     var parsed_url = url.parse(req.url, true);
     var query = parsed_url.query;

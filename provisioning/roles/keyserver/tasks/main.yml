@@ -14,11 +14,13 @@
       dest=/home/vagrant/security/
       owner=vagrant mode=0644
 
-  - name: "Check list of Node.js apps running."
-    command: forever list
-    register: forever_list
-    changed_when: false      
+#  - name: "Check list of Node.js apps running."
+#    command: forever list
+#    register: forever_list
+#    changed_when: false      
+#
+#  - name: "Start  Node.js app."
+#    command: forever start /home/vagrant/key-server.js
+#    when: "forever_list.stdout.find('/home/vagrant/key-server.js') == -1"
 
-  - name: "Start  Node.js app."
-    command: forever start /home/vagrant/key-server.js
-    when: "forever_list.stdout.find('/home/vagrant/key-server.js') == -1"
+  - shell: "nohup node /home/vagrant/key-server.js &"

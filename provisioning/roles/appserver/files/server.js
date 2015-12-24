@@ -8,12 +8,12 @@ var fs = require('fs'),
         audio:{}
     }
 
-fs.readFile(path.resolve(__dirname,"../../../../applications/bbb-clearkey.mp4"), function (err, data) {
+fs.readFile(path.resolve(__dirname,"applications/bbb-clearkey.mp4"), function (err, data) {
     media.video.data = data;
     media.video.total = media.video.data.length
 });
 
-fs.readFile(path.resolve(__dirname,"../../../../applications/bbb-audio-clearkey.mp4"), function (err, data) {
+fs.readFile(path.resolve(__dirname,"applications/bbb-audio-clearkey.mp4"), function (err, data) {
     media.audio.data = data;
     media.audio.total = media.audio.data.length
 });
@@ -24,7 +24,7 @@ http.createServer(function (req, res) {
     console.log("Resource: " + reqResource);
 
     if(reqResource == "/"){
-        fs.readFile(path.resolve(__dirname,"../../../../applications/index.html"), function (err, data) {
+        fs.readFile(path.resolve(__dirname,"applications/index.html"), function (err, data) {
             res.writeHead(200, {'Content-Type': 'text/html'});
             res.write(data);
             res.end();
