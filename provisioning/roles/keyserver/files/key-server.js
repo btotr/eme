@@ -32,7 +32,7 @@ function HexToBase64(str) {
     return b.toString('base64').replace("==", "");
 }
 
-https.createServer(options, function(req, res) {
+http.createServer(function(req, res) {
     
     var parsed_url = url.parse(req.url, true);
     var query = parsed_url.query;

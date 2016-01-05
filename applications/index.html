@@ -126,7 +126,7 @@
           var xhr = new XMLHttpRequest();
           var keyid = String.fromCharCode.apply(null, new Uint8Array(e.message));
           xhr.responseType = "arraybuffer";
-          xhr.open("GET", "https://192.168.62.11:8584?keyid="+keyid);
+          xhr.open("GET", "http://192.168.62.11:8584?keyid="+keyid);
           xhr.onreadystatechange = function() {
             if (xhr.readyState == 4 && xhr.status == 200) {
                var updateMessage = xhr.response
