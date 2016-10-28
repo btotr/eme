@@ -1,5 +1,8 @@
 ---
 
+  - name: install nodejs
+    apt: name=nodejs state=present update_cache=yes
+
 # create a directory if it doesnt exist
   - file: path=/home/vagrant/applications 
       state=directory 
@@ -11,11 +14,4 @@
       dest=/home/vagrant/
       owner=vagrant mode=0644
 
-  - name: "Check list of Node.js apps running."
-    command: forever list
-    register: forever_list
-    changed_when: false      
-
-  - name: "Start  Node.js app."
-    command: forever start /home/vagrant/server.js
-    when: "forever_list.stdout.find('/home/vagrant/server.js') == -1"
+  - shell: "nohup node /home/vagrant/server.js &"

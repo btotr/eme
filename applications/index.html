@@ -6,45 +6,44 @@
                 padding:0; margin:0;
                 min-width:1280px;
             }
+            canvas {
+              position:absolute;
+              left:10%;
+              width:80%;
+              height:10px;
+            }
         </style>
     </head>
     <body>
     <video autoplay></video>
+    <canvas><canvas>
     <script>
 
-        function MediaInfo() {
+        function MediaInfo(url, mime, size, chunks) {
+            this.mediaURL = url;
+            this.mime = mime;
+            this.sizeInBytes = size;
+            this.chunks = chunks;
             this.offset   = 0;
             this.buffer   = 0;
-            this.chunks   = 10;
-            this.chunkSize = function(){
-                return Math.floor(this.sizeInBytes/this.chunks);
+            this.chunks   = chunks || 10;
+            this.getChunkSize = function(){
+              if (!this.chunkSize) {
+                this.chunkSize = Math.floor(this.sizeInBytes/this.chunks);
+              }
+              return this.chunkSize  
             };
             this.queue = [];
         }
-
-        var videoInfo = new MediaInfo();
-        videoInfo.mediaURL = "video";
-        videoInfo.mime     = "video/mp4; codecs=\"avc1.64001F\"";
-        // ffprobe test.mp4  -show_format | grep size;
-        videoInfo.sizeInBytes = 7181049;
-        videoInfo.chunks   = 20;
-
-        var audioInfo = new MediaInfo();
-        audioInfo.mediaURL = "audio";
-        audioInfo.mime     = "audio/mp4; codecs=\"mp4a.40.2\"";
-        audioInfo.sizeInBytes = 801059;
-
-        var onSourceOpen = function() {
-            if (ms.sourceBuffers.length) {
-                return;
-            }
-            // attach the source buffers
-            videoInfo.buffer = ms.addSourceBuffer(videoInfo.mime);
-            audioInfo.buffer = ms.addSourceBuffer(audioInfo.mime);
-            // load the first chunks
-            loadChunk.call(videoInfo);
-            loadChunk.call(audioInfo);
-        };
+        
+        var mediaSources = [
+          new MediaInfo("video", "video/mp4; codecs=\"avc1.64001F\"", 7181049, 10),
+          //new MediaInfo("audio", "audio/mp4; codecs=\"mp4a.40.2\"", 801059)
+        ]
+        var video = document.getElementsByTagName("video")[0];
+        var ms = new MediaSource();
+        ms.addEventListener("sourceopen", onSourceOpen);
+        video.src =  window.URL.createObjectURL(ms);
 
         function nextChunk(){
             if (this.offset === this.chunks - 1) {
@@ -54,72 +53,80 @@
             this.offset++;
             loadChunk.call(this);
         }
+        
+        function addBuffer(buf){
+          // only update if we are finishing updating
+          if (this.buffer.updating || this.queue.length == 0) {
+              this.queue.push(buf);
+              if (this.buffer.updating) {
+                  return;
+              }
+          }
+
+          // append buffer to source buffer
+          this.buffer.appendBuffer(this.queue.shift());
+          var self  = this;
+          var testUpdate = function(timeEvent){
+              var dur = video.duration;
+              var chunkDuration = dur/self.chunks;
+              // 40% fudge factor
+              var threshold = self.offset * chunkDuration * 0.6;
+              if (timeEvent.target.currentTime >= threshold) {
+                  video.removeEventListener("timeupdate", testUpdate, false);
+                  nextChunk.call(self);
+              }
+          };
+          video.addEventListener("timeupdate", testUpdate, false);
+        }
 
         function loadChunk(){
             var xhr = new XMLHttpRequest();
             xhr.open("GET", this.mediaURL);
             xhr.responseType = "arraybuffer";
-            var chunkSize = this.chunkSize();
+            var chunkSize = this.getChunkSize();
             var startByte = parseInt(chunkSize * this.offset);
             var range = startByte + "-" + (startByte + chunkSize - 1);
             console.info("loading next chunk: ", range, this.offset);
             xhr.setRequestHeader("Range", "bytes=" + range);
-
-            var self = this;
             xhr.addEventListener("load", function(e) {
-                var buf = new Uint8Array(e.target.response);
-
-                // only update if we are finishing updating
-                if (self.buffer.updating || self.queue.length === 0) {
-                    self.queue.push(buf);
-                    if (self.buffer.updating) {
-                        return;
-                    }
-                }
-
-                var append = function(buffer) {
-                    // cloudtv doesn't support appendBuffer use append instead
-                    if (!self.buffer.appendBuffer) {
-                        self.buffer.append(buffer);
-                        return;
-                    }
-                    self.buffer.appendBuffer(buffer);
-                };
-
-                // append buffer to source buffer
-                append(self.queue.shift());
-
-                var testUpdate = function(timeEvent){
-                    var dur = video.duration;
-                    if (isNaN(dur) || dur === Infinity) {
-                        dur = 33; //static if no video durartion
-                    }
-                    var chunkDuration = dur/self.chunks;
-                    // 40% fudge factor
-                    var threshold = self.offset * chunkDuration * 0.6;
-                    if (timeEvent.target.currentTime >= threshold) {
-                        video.removeEventListener("timeupdate", testUpdate, false);
-                        nextChunk.call(self);
-                    }
-                };
-                video.addEventListener("timeupdate", testUpdate, false);
-            });
+                addBuffer.call(this, new Uint8Array(e.target.response));
+            }.bind(this));
             xhr.send();
         }
+        
+        function onSourceOpen() {
+            for (var i = 0,l = mediaSources.length;i<l;i++){
+              var source = mediaSources[i]
+              // attach the source buffers
+              source.buffer = this.addSourceBuffer(source.mime);
+              // load the first chunks
+              loadChunk.call(source);
+            }
+        };
 
-        // attach to video element
-        var video = document.getElementsByTagName("video")[0];
-        
-        // MSE
-        if (window.WebKitMediaSource !== undefined) {
-            window.MediaSource = window.WebKitMediaSource;
-        }
-        var ms = new MediaSource();
-        ms.addEventListener("sourceopen", onSourceOpen);
-        ms.addEventListener("webkitsourceopen", onSourceOpen);
-        
-        video.src =  window.URL.createObjectURL(ms);
-        
+        // progress
+        video.addEventListener("loadeddata", function(){
+          var progressBar = document.getElementsByTagName('canvas')[0];
+          var context = progressBar.getContext('2d');
+          context.fillStyle = 'lightgray';
+          context.fillRect(0, 0, progressBar.width, progressBar.height);
+          context.fillStyle = 'red';
+          context.strokeStyle = 'white';
+          var inc =  progressBar.width / video.duration;
+          console.log(inc, progressBar.width , video.duration)
+          video.addEventListener('seeked', function() {
+                for (i = 0; i < video.buffered.length; i++) {
+                  var startX = video.buffered.start(i) * inc;
+                  var endX = video.buffered.end(i) * inc;
+                  console.log(startX, endX, video.buffered)
+                  var width = endX - startX;
+                  context.fillRect(startX, 0, width, progressBar.height);
+                  context.rect(startX, 0, width, progressBar.height);
+                  context.stroke();
+                }
+          });
+        }, false);
+
         // EME
        function updateCDM(e){
           // license request
@@ -147,8 +154,8 @@
          navigator.requestMediaKeySystemAccess("org.w3.clearkey", [
             {
                initDataTypes: ["cenc"],
-               videoCapabilities: [{contentType: videoInfo.mime}],
-               audioCapabilities: [{contentType: audioInfo.mime}]
+               videoCapabilities: [{contentType: "video/mp4; codecs=\"avc1.64001F\""}],
+               audioCapabilities: [{contentType: "audio/mp4; codecs=\"mp4a.40.2\""}]
             } 
          ]).then(function(keySystemAccess) {
              return keySystemAccess.createMediaKeys();

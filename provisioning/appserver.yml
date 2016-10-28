@@ -2,5 +2,4 @@
  - hosts: all
    sudo: yes
    roles:
-    - geerlingguy.nodejs
     - appserver

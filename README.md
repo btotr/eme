@@ -7,10 +7,6 @@ minimalistic example using Encrypted Media Extensions (see: https://w3c.github.i
 - vagrant
 - ansible
 
-## install
-
-`ansible-galaxy install geerlingguy.nodejs`
-
 ## usage
 
 `vagrant up`
